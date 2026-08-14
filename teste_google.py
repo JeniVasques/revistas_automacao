@@ -7,7 +7,7 @@ SCOPES = [
 ]
 
 creds = Credentials.from_service_account_file(
-    "automacaoeditais-8f0db36dc8e9.json",
+    "adicionar JSON",
     scopes=SCOPES
 )
 
