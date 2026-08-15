@@ -636,6 +636,129 @@ def processar_links(links):
     
     return dados_saida
 
+def formatar_planilha(saida, total_linhas):
+    """Aplica cores condicionais, cabeçalho em negrito e congela a primeira linha."""
+
+    sheet_id = saida.id
+
+    requests_formatacao = [
+        # Cabeçalho em negrito com fundo cinza
+        {
+            "repeatCell": {
+                "range": {
+                    "sheetId": sheet_id,
+                    "startRowIndex": 0,
+                    "endRowIndex": 1
+                },
+                "cell": {
+                    "userEnteredFormat": {
+                        "backgroundColor": {"red": 0.85, "green": 0.85, "blue": 0.85},
+                        "textFormat": {"bold": True}
+                    }
+                },
+                "fields": "userEnteredFormat(backgroundColor,textFormat)"
+            }
+        },
+        # Congela a primeira linha (cabeçalho)
+        {
+            "updateSheetProperties": {
+                "properties": {
+                    "sheetId": sheet_id,
+                    "gridProperties": {"frozenRowCount": 1}
+                },
+                "fields": "gridProperties.frozenRowCount"
+            }
+        },
+        # Cor verde clara para linhas com status "OK" (coluna G, índice 6)
+        {
+            "addConditionalFormatRule": {
+                "rule": {
+                    "ranges": [{
+                        "sheetId": sheet_id,
+                        "startRowIndex": 1,
+                        "endRowIndex": total_linhas + 1,
+                        "startColumnIndex": 0,
+                        "endColumnIndex": 7
+                    }],
+                    "booleanRule": {
+                        "condition": {
+                            "type": "CUSTOM_FORMULA",
+                            "values": [{"userEnteredValue": '=$G2="OK"'}]
+                        },
+                        "format": {
+                            "backgroundColor": {"red": 0.80, "green": 0.94, "blue": 0.80}
+                        }
+                    }
+                },
+                "index": 0
+            }
+        },
+        # Cor amarela clara para "PARCIAL"
+        {
+            "addConditionalFormatRule": {
+                "rule": {
+                    "ranges": [{
+                        "sheetId": sheet_id,
+                        "startRowIndex": 1,
+                        "endRowIndex": total_linhas + 1,
+                        "startColumnIndex": 0,
+                        "endColumnIndex": 7
+                    }],
+                    "booleanRule": {
+                        "condition": {
+                            "type": "CUSTOM_FORMULA",
+                            "values": [{"userEnteredValue": '=$G2="PARCIAL"'}]
+                        },
+                        "format": {
+                            "backgroundColor": {"red": 1.0, "green": 0.95, "blue": 0.70}
+                        }
+                    }
+                },
+                "index": 1
+            }
+        },
+        # Cor cinza clara para "FORA_DO_ESCOPO"
+        {
+            "addConditionalFormatRule": {
+                "rule": {
+                    "ranges": [{
+                        "sheetId": sheet_id,
+                        "startRowIndex": 1,
+                        "endRowIndex": total_linhas + 1,
+                        "startColumnIndex": 0,
+                        "endColumnIndex": 7
+                    }],
+                    "booleanRule": {
+                        "condition": {
+                            "type": "CUSTOM_FORMULA",
+                            "values": [{"userEnteredValue": '=$G2="FORA_DO_ESCOPO"'}]
+                        },
+                        "format": {
+                            "backgroundColor": {"red": 0.90, "green": 0.90, "blue": 0.90}
+                        }
+                    }
+                },
+                "index": 2
+            }
+        },
+        # Auto-ajusta largura das colunas
+        {
+            "autoResizeDimensions": {
+                "dimensions": {
+                    "sheetId": sheet_id,
+                    "dimension": "COLUMNS",
+                    "startIndex": 0,
+                    "endIndex": 7
+                }
+            }
+        }
+    ]
+
+    saida.spreadsheet.batch_update({"requests": requests_formatacao})
+
+
+
+
 # =====================================================
 # FUNÇÃO PRINCIPAL
 # =====================================================
@@ -675,12 +798,17 @@ def main():
     print("=" * 80)
     print("INICIANDO PROCESSAMENTO DE DATAS DE SUBMISSÃO")
     print("=" * 80)
-    
+
     # Processa os links
     dados_processados = processar_links(links)
-    
+
+    # Ordena: OK primeiro, depois PARCIAL, depois FORA_DO_ESCOPO
+    ordem_status = {"OK": 0, "PARCIAL": 1, "FORA_DO_ESCOPO": 2}
+    dados_processados.sort(key=lambda linha: ordem_status.get(linha[6], 99))
+
     # Limpa e escreve na planilha
     saida.clear()
+
     saida.append_row([
         "DATA DE SUBMISSÃO",
         "REVISTA", 
@@ -694,6 +822,7 @@ def main():
     # Atualiza com os dados
     if dados_processados:
         saida.update(f"A2:G{len(dados_processados)+1}", dados_processados)
+        formatar_planilha(saida, len(dados_processados))
     
     print("=" * 80)
     print(f"\nPROCESSAMENTO CONCLUIDO!")
