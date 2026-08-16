@@ -1,2 +1,0 @@
-quero ajeitar esse codigo para que ele cumpra com a prposta dele que é entrar num link de uma revista e tirar de la dados 
-como, data de submissão, nome da revista, nome/titulo da chamada do edital, a qualis da revista que é composta por uma letra em maisuculo + um numero, o codigo da revista ISSN/ISBN. Quero a extração mais limpa e certa possivel.
