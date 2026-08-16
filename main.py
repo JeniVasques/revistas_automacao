@@ -5,6 +5,8 @@ from bs4 import BeautifulSoup
 from urllib.parse import urlparse
 from google.oauth2.service_account import Credentials
 from datetime import datetime
+import os
+import json
 
 
 # =====================================================
@@ -818,24 +820,27 @@ def formatar_planilha(saida, total_linhas):
     saida.spreadsheet.batch_update({"requests": requests_formatacao})
 
 
-
-
-# =====================================================
 # FUNÇÃO PRINCIPAL
-# =====================================================
 def main():
-    # =====================================================
+
     # GOOGLE API
-    # =====================================================
     SCOPES = [
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive"
     ]
     
-    credentials = Credentials.from_service_account_file(
-        "automacaoeditais-8f0db36dc8e9.json",
-        scopes=SCOPES
-    )
+    credenciais_env = os.environ.get("GOOGLE_CREDENTIALS")
+
+    if credenciais_env:
+        # Rodando no GitHub Actions (nuvem) — lê a credencial do "Secret"
+        info = json.loads(credenciais_env)
+        credentials = Credentials.from_service_account_info(info, scopes=SCOPES)
+    else:
+        # Rodando no seu PC — continua lendo do arquivo local, como sempre
+        credentials = Credentials.from_service_account_file(
+            "automacaoeditais-8f0db36dc8e9.json",
+            scopes=SCOPES
+        )
     
     gc = gspread.authorize(credentials)
     
