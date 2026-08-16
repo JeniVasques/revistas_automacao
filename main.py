@@ -20,6 +20,19 @@ session.headers.update({
     "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8"
 })
 
+
+def carregar_dados_existentes(saida):
+    """Lê a planilha atual e retorna {link: [linha1, linha2, ...]} das linhas já OK."""
+    valores = saida.get_all_values()
+
+    dados_ok = {}
+    for linha in valores[1:]:  # pula o cabeçalho
+        if len(linha) >= 7 and linha[6].strip().upper() == "OK":
+            link = linha[5]
+            dados_ok.setdefault(link, []).append(linha[:7])
+
+    return dados_ok
+
 def extrair_qualis(texto):
 
     texto_upper = texto.upper()
@@ -321,7 +334,46 @@ def extrair_multiplas_chamadas(texto):
         if data != "-":
             chamadas.append({"tema": tema, "data": data})
 
+    if chamadas:
+        return chamadas
+
+    # Padrão 3: "EDIÇÃO <período> – a ser publicada... <TEMA> Doutor(a)... Envio de artigos até <data>."
+    padrao3 = (
+        r'a ser publicada\s+no\s+m[êe]s\s+(?:de\s+)?[a-zçã]+\s+de\s+\d{4}\s+'
+        r'(.+?)\s+'
+        r'(?:Doutor|Doutora|Doutorando|Doutoranda|Mestr|Especialista)'
+        r'.*?'
+        r'Envio de artigos at[ée]\s*(\d{1,2}/\d{1,2}/\d{4})'
+    )
+
+    for match in re.finditer(padrao3, texto_norm, re.IGNORECASE | re.DOTALL):
+        tema = match.group(1).strip()
+        data = limpar_data(match.group(2).strip())
+        if data != "-" and len(tema) > 10:
+            chamadas.append({"tema": tema, "data": data})
+
+    if chamadas:
+            return chamadas
+
+    # Padrão 4: Dossiê "título" ... Prazo (para envio dos artigos/submissão): dd-mm-aaaa
+    padrao4 = (
+        r'Dossiê\s*["“]([^"”]+)["”]'
+        r'.*?'
+        r'Prazo\s+(?:para\s+envio\s+dos\s+artigos|para\s+submiss[ãa]o|de\s+submiss[ãa]o)?\s*:\s*'
+        r'(\d{1,2}[-/]\d{1,2}[-/]\d{4})'
+    )
+
+    for match in re.finditer(padrao4, texto_norm, re.IGNORECASE | re.DOTALL):
+        tema = match.group(1).strip()
+        data = limpar_data(match.group(2).strip())
+        if data != "-" and len(tema) > 10:
+            chamadas.append({"tema": tema, "data": data})
+
+    if chamadas:
+        return chamadas
+
     return chamadas
+
 
 PREFIXOS_GENERICOS = [
     r'^chamada\s+de\s+artigos\s*[-:–]\s*',
@@ -441,13 +493,22 @@ def extrair_tema_avancado(sopa, texto_pagina):
 
             return tema
 
+    if sopa.title:
+        title_text = sopa.title.get_text(" ", strip=True)
+        if "|" in title_text:
+            candidato = title_text.split("|")[0].strip()
+            candidato = limpar_prefixo_generico(candidato)
+            if len(candidato) > 10:
+                return cortar_lixo_final(candidato)
+
     # 3. Busca em títulos H1/H2/H3
     titulos = sopa.find_all(['h1', 'h2', 'h3'])
     candidatos = []
 
     palavras = [
-        'dossiê','dossie','call for papers','special issue','edição especial','número especial','thematic issue','chamada'
-
+        'dossiê','dossie','call for papers','special issue',
+        'edição especial','número especial','thematic issue',
+        'chamada'
     ]
 
     for titulo in titulos:
@@ -800,7 +861,29 @@ def main():
     print("=" * 80)
 
     # Processa os links
+    # Carrega linhas já OK (robô ou humano) — não serão sobrescritas
+    dados_ok_existentes = carregar_dados_existentes(saida)
+
+    # Processa os links
     dados_processados = processar_links(links)
+
+    # Preserva a versão OK já existente, casando pelo TEMA (já que um link pode ter várias chamadas)
+    for i, linha in enumerate(dados_processados):
+        link = linha[5]
+        tema_novo = linha[2]
+
+        if link in dados_ok_existentes:
+            candidatas = dados_ok_existentes[link]
+
+            # Tenta achar a linha OK com o mesmo tema
+            match = next((c for c in candidatas if c[2].strip() == tema_novo.strip()), None)
+
+            # Se o link só tem 1 chamada, não precisa casar por tema
+            if not match and len(candidatas) == 1:
+                match = candidatas[0]
+
+            if match:
+                dados_processados[i] = match
 
     # Ordena: OK primeiro, depois PARCIAL, depois FORA_DO_ESCOPO
     ordem_status = {"OK": 0, "PARCIAL": 1, "FORA_DO_ESCOPO": 2}
