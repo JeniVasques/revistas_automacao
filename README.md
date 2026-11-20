@@ -101,5 +101,4 @@ Para ativar:
 - Instituição: UFAM
 
 ## Licença
-
-_(Escolha uma licença, por exemplo MIT, e adicione o arquivo `LICENSE` ao repositório.)_
+MIT
