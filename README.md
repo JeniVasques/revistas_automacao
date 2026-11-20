@@ -96,9 +96,9 @@ Para ativar:
 
 ## Autoria
 
-- Autoria: _(nome do aluno)_
-- Orientação: _(nome da orientadora)_
-- Instituição: _(instituição)_
+- Autoria: Jenifer Gomes Vasques 
+- Orientação: Maria Nilvane
+- Instituição: UFAM
 
 ## Licença
 
